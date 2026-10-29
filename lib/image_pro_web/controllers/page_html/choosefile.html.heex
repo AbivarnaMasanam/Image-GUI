@@ -1,0 +1,316 @@
+<%!--
+  ImagePro - upload + editor page (LiveView template).
+  No <html>/<head>/<body> here: the Phoenix layout already provides them.
+  Set the page title in mount/handle_params:  assign(socket, :page_title, "Rotate Page")
+  Load the stylesheet once in your layout:    <link rel="stylesheet" href={~p"/assets/imagepro.css"} />
+--%>
+<head><link rel="stylesheet" href={~p"/assets/imagepro.css"} />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<div class="page-wrapper">
+  <main class="page-main">
+    <%= if @images == [] do %>
+      <%!-- ===================== UPLOAD PAGE ===================== --%>
+      <div class="container">
+        <div class="card">
+          <header class="header">
+            <div class="badge">Image Processing</div>
+            <h1><%= String.capitalize(@operation) %> Image</h1>
+            <p>Choose up to 10 images to begin processing</p>
+          </header>
+
+          <form id="upload-form" phx-change="validate" phx-submit="process_image">
+            <div class="file-input-wrapper">
+              <.live_file_input upload={@uploads.image} />
+            </div>
+
+            <label class="choose-area" for={@uploads.image.ref} phx-drop-target={@uploads.image.ref}>
+              <div class="icon-container">
+                <i class="fa-solid fa-arrow-up-from-bracket"></i>
+              </div>
+              <p class="choose-title">Choose your images</p>
+              <p class="choose-description">Select one or multiple images from your device</p>
+              <p class="choose-hint">• Maximum 10 images • 10MB each</p>
+              <span class="browse-btn">Browse Files</span>
+            </label>
+
+            <%= if @uploads.image.entries != [] do %>
+              <div class="selected-header">
+                <h3>Selected Images</h3>
+                <p><%= length(@uploads.image.entries) %> of 10 images selected</p>
+              </div>
+
+              <div class="preview-list">
+                <div :for={entry <- @uploads.image.entries} class="preview-card">
+                  <div class="preview-thumb-box">
+                    <.live_img_preview entry={entry} class="preview-thumb" />
+                  </div>
+
+                  <div class="preview-info">
+                    <div class="preview-name"><%= entry.client_name %></div>
+                    <div class="preview-meta">
+                      <span><%= Float.round(entry.client_size / 1024, 1) %> KB</span>
+                      <span>•</span>
+                      <span><%= entry.client_type %></span>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    class="remove-btn"
+                    phx-click="cancel-upload"
+                    phx-value-ref={entry.ref}
+                    title="Remove image"
+                    aria-label="Remove image"
+                  >
+                    <i class="fa-solid fa-xmark"></i>
+                  </button>
+                </div>
+              </div>
+            <% end %>
+
+            <%!-- Errors: whole upload (e.g. too many files) and per file --%>
+            <div :for={err <- upload_errors(@uploads.image)} class="error-message">
+              <%= Phoenix.Naming.humanize(err) %>
+            </div>
+            <%= for entry <- @uploads.image.entries, err <- upload_errors(@uploads.image, entry) do %>
+              <div class="error-message">
+                <%= entry.client_name %>: <%= Phoenix.Naming.humanize(err) %>
+              </div>
+            <% end %>
+
+            <button type="submit" class="submit-btn" disabled={@uploads.image.entries == []}>
+              Continue Editing
+              <i class="fa-solid fa-arrow-right"></i>
+            </button>
+          </form>
+
+          <div class="footer-action">
+            <a href="/" class="back-link">
+              <i class="fa-solid fa-arrow-left"></i>
+              Back to processing options
+            </a>
+          </div>
+        </div>
+      </div>
+    <% else %>
+      <%!-- ===================== EDITOR PAGE ===================== --%>
+      <div class="editor-container">
+        <div class="editor-header">
+          <div>
+            <div class="badge">Image Processing</div>
+            <h1><%= String.capitalize(@operation) %> Images</h1>
+            <p>Select an image and customize the processing options</p>
+          </div>
+
+          <div class="image-count">
+            <span class="count-number"><%= length(@images) %></span>
+            <span>Images</span>
+          </div>
+        </div>
+
+        <div class="editor-card">
+          <%!-- ---------- LEFT: image list ---------- --%>
+          <aside class="image-sidebar">
+            <div class="sidebar-header">
+              <h2>Your Images</h2>
+              <span><%= length(@images) %>/10</span>
+            </div>
+
+            <div class="image-list">
+              <div
+                :for={{image, index} <- Enum.with_index(@images, 1)}
+                class={["image-item", @selected_image == image.id && "selected"]}
+                phx-click="select_image"
+                phx-value-id={image.id}
+              >
+                <div class="image-number"><%= index %></div>
+
+                <div class="image-mini-preview">
+                  <img src={image.thumbnail_path} alt={image.filename} />
+                </div>
+
+                <div class="image-details">
+                  <div class="image-filename"><%= image.filename %></div>
+                  <div class="image-status">
+                    <%= cond do %>
+                      <% @operation == "rotate" and image.rotation != 0 -> %>
+                        <%= image.rotation %>° rotation
+                      <% @operation == "invert" and image.inverted -> %>
+                        Inverted
+                      <% @operation in ["compress", "convert"] and image.quality != 100 -> %>
+                        Quality <%= image.quality %>% • .jpg
+                      <% true -> %>
+                        Original
+                    <% end %>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </aside>
+
+          <%!-- ---------- RIGHT: editing options ---------- --%>
+          <section class="editor-panel">
+            <div class="panel-header">
+              <span class="panel-label">Editing</span>
+              <h2><%= String.capitalize(@operation) %></h2>
+            </div>
+
+            <%= if @selected_image do %>
+              <%!-- live preview of the selected image --%>
+              <div :for={image <- @images} :if={image.id == @selected_image} class="live-preview">
+                <div class="live-preview-box">
+                  <img
+                    src={image.thumbnail_path}
+                    alt={image.filename}
+                    style={
+                      cond do
+                        @operation == "rotate" -> "transform: rotate(#{@rotation}deg);"
+                        @operation == "invert" -> "filter: invert(1);"
+                        true -> ""
+                      end
+                    }
+                  />
+                </div>
+                <span class="live-preview-name"><%= image.filename %></span>
+              </div>
+
+              <div class="option-section">
+                <%!-- ===== ROTATE ===== --%>
+                <%= if @operation == "rotate" do %>
+                  <h3>Rotation Angle</h3>
+                  <p class="option-description">
+                    Pick a preset or enter any angle from 1° to 360°.
+                  </p>
+
+                  <div class="rotation-options">
+                    <button
+                      :for={{deg, label} <- [{90, "Clockwise"}, {180, "Half turn"}, {270, "Clockwise"}]}
+                      type="button"
+                      class={["rotation-card", @rotation == deg && "active"]}
+                      phx-click="set_rotation"
+                      phx-value-rotation={deg}
+                    >
+                      <strong><%= deg %>°</strong>
+                      <small><%= label %></small>
+                    </button>
+                  </div>
+
+                  <form id="custom-rotation-form" phx-change="set_custom_rotation" class="custom-box">
+                    <div class="custom-head">
+                      <label for="rotation-number">Custom angle</label>
+                      <div class="number-wrap">
+                        <input
+                          id="rotation-number"
+                          type="number"
+                          name="rotation_number"
+                          min="1"
+                          max="360"
+                          step="1"
+                          value={@rotation}
+                          phx-debounce="200"
+                        />
+                        <span>°</span>
+                      </div>
+                    </div>
+                    <input
+                      type="range"
+                      name="rotation_range"
+                      min="1"
+                      max="360"
+                      step="1"
+                      value={@rotation}
+                      class="range-slider"
+                      aria-label="Custom rotation angle"
+                    />
+                    <div class="range-labels"><span>1°</span><span>360°</span></div>
+                  </form>
+                <% end %>
+
+                <%!-- ===== INVERT ===== --%>
+                <%= if @operation == "invert" do %>
+                  <h3>Invert Colors</h3>
+                  <p class="option-description">
+                    Choose whether to invert only the selected image or every image.
+                  </p>
+                <% end %>
+
+                <%!-- ===== COMPRESS / CONVERT ===== --%>
+                <%= if @operation in ["compress", "convert"] do %>
+                  <h3>Quality</h3>
+                  <p class="option-description">
+                    100 keeps the original quality. Lower values compress the image more.
+                    Every image is saved as <strong>.jpg</strong>, whatever its original type.
+                  </p>
+
+                  <form id="quality-form" phx-change="set_quality" class="custom-box">
+                    <div class="custom-head">
+                      <label for="quality-number">Quality</label>
+                      <div class="number-wrap">
+                        <input
+                          id="quality-number"
+                          type="number"
+                          name="quality_number"
+                          min="0"
+                          max="100"
+                          step="1"
+                          value={@quality}
+                          phx-debounce="200"
+                        />
+                        <span>%</span>
+                      </div>
+                    </div>
+                    <input
+                      type="range"
+                      name="quality_range"
+                      min="0"
+                      max="100"
+                      step="1"
+                      value={@quality}
+                      class="range-slider"
+                      aria-label="Quality"
+                    />
+                    <div class="range-labels"><span>Smaller file</span><span>Original quality</span></div>
+                  </form>
+
+                  <div class="format-note">
+                    <span class="format-chip">.jpg</span>
+                    Output format is applied automatically.
+                  </div>
+                <% end %>
+
+                <%!-- Shared apply buttons: selected image / all images --%>
+                <div class="action-group">
+                  <button type="button" class="secondary-btn" phx-click="apply_selected">
+                    Apply to Selected
+                  </button>
+                  <button type="button" class="primary-small-btn" phx-click="apply_all">
+                    Apply to All
+                  </button>
+                </div>
+              </div>
+            <% else %>
+              <div class="empty-editor">
+                <div class="empty-icon">
+                  <i class="fa-regular fa-image"></i>
+                </div>
+                <h3>Select an image</h3>
+                <p>Choose an image from the left to start editing.</p>
+              </div>
+            <% end %>
+
+            <div class="process-section">
+              <button type="button" class="submit-btn" phx-click="process_final">
+                Process Images
+                <i class="fa-solid fa-arrow-right"></i>
+              </button>
+              <p>Your processed images will be prepared for download.</p>
+            </div>
+          </section>
+        </div>
+      </div>
+    <% end %>
+  </main>
+
+  <footer class="page-footer">© 2026 ImagePro Created by Abivarna M.</footer>
+</div>
