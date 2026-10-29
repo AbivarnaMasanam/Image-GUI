@@ -1,0 +1,80 @@
+<%!--
+  ImagePro - download page (LiveView template).
+  Assigns expected:
+    @operation   "rotate" | "invert" | "compress" | "convert"
+    @results     list of %{id, filename, thumbnail_path, size, url}   (processed files)
+    @zip_url     nil for a single image, or a URL to the .zip for a group
+--%>
+<head><link rel="stylesheet" href={~p"/assets/imagepro.css"} />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+
+<div class="page-wrapper">
+  <main class="page-main">
+    <div class="container container-wide">
+      <div class="card">
+        <header class="header">
+          <div class="badge">Image Processing</div>
+
+          <div class="success-icon">
+           <i class="fa-solid fa-check"></i>
+          </div>
+
+          <h1>Your images are ready</h1>
+          <p>
+            <%= length(@results) %>
+            <%= if length(@results) == 1, do: "image", else: "images" %>
+            processed with <strong><%= @operation %></strong>.
+          </p>
+        </header>
+
+        <%!-- Single image: direct download. Group: one zip. --%>
+        <%= if @zip_url do %>
+          <a href={@zip_url} download class="submit-btn download-main">
+            <i class="fa-solid fa-arrow-down"></i>
+            Download all as ZIP
+          </a>
+        <% else %>
+          <% [only] = @results %>
+          <a href={only.url} download={only.filename} class="submit-btn download-main">
+           <i class="fa-solid fa-arrow-down"></i>
+            Download image
+          </a>
+        <% end %>
+
+        <div class="selected-header">
+          <h3>Processed files</h3>
+          <p><%= length(@results) %> total</p>
+        </div>
+
+        <div class="preview-list">
+          <div :for={file <- @results} class="preview-card">
+            <div class="preview-thumb-box">
+              <img src={file.thumbnail_path} alt={file.filename} class="preview-thumb" />
+            </div>
+
+            <div class="preview-info">
+              <div class="preview-name"><%= file.filename %></div>
+              <div class="preview-meta">
+                <span><%= Float.round(file.size / 1024, 1) %> KB</span>
+              </div>
+            </div>
+
+            <a href={file.url} download={file.filename} class="icon-btn" title="Download" aria-label={"Download " <> file.filename}>
+              <i class="fa-solid fa-arrow-down"></i>
+            </a>
+          </div>
+        </div>
+
+        <div class="footer-action footer-split">
+          <a href="/" class="back-link">
+            <i class="fa-solid fa-arrow-left"></i>
+            Back to processing options
+          </a>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <footer class="page-footer">© 2026 ImagePro Created by Abivarna M.</footer>
+</div>
