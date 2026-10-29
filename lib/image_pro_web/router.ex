@@ -17,8 +17,10 @@ defmodule ImageProWeb.Router do
   scope "/", ImageProWeb do
     pipe_through(:browser)
 
-    get("/", PageController, :home)
-    get("/abi", AbiController, :abi)
+    live("/", PageLive)
+    live("/image-processor", ImageProcessorLive)
+    # live("/rotate", ImageProcessorLive)
+    live "/process/:operation", ImageProcessorLive
   end
 
   # Other scopes may use custom stacks.
