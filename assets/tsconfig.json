@@ -28,5 +28,5 @@
     "allowJs": true,
     "noEmit": true
   },
-  "include": ["js/**/*"]
+  "include": ["js/**/*", "../lib/image_pro_web/controllers/page_html/script.js"]
 }

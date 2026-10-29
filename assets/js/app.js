@@ -47,7 +47,8 @@ liveSocket.connect()
 window.liveSocket = liveSocket
 
 // The lines below enable quality of life phoenix_live_reload
-// development features:
+// development features:￼
+
 //
 //     1. stream server logs to the browser console
 //     2. click on elements to jump to their definitions in your code editor
