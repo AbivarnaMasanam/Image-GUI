@@ -20,7 +20,7 @@ defmodule ImageProWeb.Router do
     live("/", PageLive)
     live("/image-processor", ImageProcessorLive)
     # live("/rotate", ImageProcessorLive)
-    live "/process/:operation", ImageProcessorLive
+    live("/process/:operation", ImageProcessorLive)
   end
 
   # Other scopes may use custom stacks.
